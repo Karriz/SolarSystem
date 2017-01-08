@@ -2,20 +2,6 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class EclipticCoordinates
-{
-    public float longitude;
-    public float latitude;
-    public float distance;
-
-    public EclipticCoordinates(float lat, float lon, float r)
-    {
-        latitude = lat;
-        longitude = lon;
-        distance = r;
-    }
-}
-
 public class Orbit {
 
     private int century = 36525;
@@ -36,7 +22,7 @@ public class Orbit {
     private float long_an_rate;
 
     private System.DateTime epoch;
-    private float julianEpoch;
+    private double julianEpoch;
 
     public Orbit(float par_a, float par_a_rate, float par_e, float par_e_rate, float par_i, float par_i_rate, float par_long_an, float par_long_an_rate, float par_long_pe, float par_long_pe_rate, float par_L, float par_L_rate)
     {
@@ -57,11 +43,13 @@ public class Orbit {
         julianEpoch = ToJulianDate(epoch);
     }
 
-    public EclipticCoordinates CalculateEclipticalCoordinates(System.DateTime date)
+    public Vector3 CalculateCartesianCoordinates(System.DateTime date)
     {
-        float JD = ToJulianDate(date);
+        double JD = ToJulianDate(date);
 
-        float centuries = (JD - julianEpoch) / 36525;
+        float centuries = (float)((JD - julianEpoch) / 36525.0);
+
+        //Debug.Log(centuries);
 
         float current_a = a + (a_rate * centuries);
 
@@ -82,26 +70,36 @@ public class Orbit {
 
         float E = CalculateEccentricAnomaly(current_M, current_e);
 
-        float temp_true_anomaly = Mathf.Sqrt((1 + (float)current_e) / (1 - (float)current_e)) * Mathf.Tan(Mathf.Deg2Rad*E / 2);
-        float true_anomaly = 2*Mathf.Atan(temp_true_anomaly);
+        //float temp_true_anomaly = Mathf.Sqrt((1 + current_e) / (1 - current_e)) * Mathf.Tan(Mathf.Deg2Rad*(E / 2));
+        //float true_anomaly = 2*Mathf.Atan(temp_true_anomaly);
 
-        float u = current_L + true_anomaly - current_M - current_long_an;
+        float true_anomaly = Mathf.Rad2Deg * 2 * Mathf.Atan2(Mathf.Sqrt(1-current_e)*Mathf.Cos(Mathf.Deg2Rad*E/2), Mathf.Sqrt(1 + current_e) * Mathf.Sin(Mathf.Deg2Rad * E / 2));
+        true_anomaly = 180 - true_anomaly;
+        if (true_anomaly < 0)
+        {
+            true_anomaly += 360;
+        }
+        else
+        {
+            true_anomaly -= 360;
+        }
 
-        float temp_longitude = Mathf.Cos(Mathf.Deg2Rad * current_i) * Mathf.Tan(Mathf.Deg2Rad*u);
-        float longitude = Mathf.Atan(temp_longitude) + current_long_an;
+        float r = current_a * (1 - current_e * Mathf.Cos(Mathf.Deg2Rad * E));
 
-        float temp_latitude = Mathf.Sin(Mathf.Deg2Rad*u) * Mathf.Sin(Mathf.Deg2Rad*current_i);
-        float latitude = Mathf.Asin(temp_latitude);
+        float x = r * (Mathf.Cos(Mathf.Deg2Rad * current_long_an) * Mathf.Cos(Mathf.Deg2Rad * (true_anomaly + current_long_pe - current_long_an)) - Mathf.Sin(Mathf.Deg2Rad * current_long_an) * Mathf.Sin(Mathf.Deg2Rad * (true_anomaly + current_long_pe - current_long_an)) * Mathf.Cos(Mathf.Deg2Rad * i));
+        float y = r * (Mathf.Sin(Mathf.Deg2Rad * current_long_an) * Mathf.Cos(Mathf.Deg2Rad * (true_anomaly + current_long_pe - current_long_an)) + Mathf.Cos(Mathf.Deg2Rad * current_long_an) * Mathf.Sin(Mathf.Deg2Rad * (true_anomaly + current_long_pe - current_long_an)) * Mathf.Cos(Mathf.Deg2Rad * i));
+        float z = r * (Mathf.Sin(Mathf.Deg2Rad * (true_anomaly + current_long_pe - current_long_an)) * Mathf.Sin(Mathf.Deg2Rad * i));
 
-        float r = current_a * (1 - current_e * Mathf.Cos(Mathf.Deg2Rad*E));
+        /*Debug.Log(r);
+        Debug.Log(current_M % 360);
+        Debug.Log(E % 360);
+        Debug.Log(true_anomaly);*/
 
-        Debug.Log(r);
-        Debug.Log(longitude);
-
-        EclipticCoordinates coordinates = new EclipticCoordinates(latitude, longitude, r);
+        Vector3 coordinates = new Vector3(x, y, z);
 
         return coordinates;
     }
+
 
     public float CalculateEccentricAnomaly(float par_M, float par_e)
     {
@@ -115,32 +113,29 @@ public class Orbit {
             E0 = E1;
             E1 = E0 - (E0 - current_e * Mathf.Sin(E0) - current_M) / (1f - current_e * Mathf.Cos(E0));
         } while (Mathf.Abs(E0 - E1) > 0.0001f);
-        return Mathf.Rad2Deg*E1;
+        return Mathf.Rad2Deg * E1;
     }
 
-    public Vector3 CalculateCartesianCoordinates(System.DateTime date)
+    public double ToJulianDate(System.DateTime date)
     {
-        EclipticCoordinates eclipticCoordinates = CalculateEclipticalCoordinates(date);
-        float x = eclipticCoordinates.distance * Mathf.Cos(Mathf.Deg2Rad * eclipticCoordinates.latitude) * Mathf.Cos(Mathf.Deg2Rad * eclipticCoordinates.longitude);
-        float y = eclipticCoordinates.distance * Mathf.Cos(Mathf.Deg2Rad * eclipticCoordinates.latitude) * Mathf.Sin(Mathf.Deg2Rad * eclipticCoordinates.longitude);
-        float z = eclipticCoordinates.distance * Mathf.Sin(Mathf.Deg2Rad * eclipticCoordinates.latitude);
-        return new Vector3(x, y, z);
-    }
+        double JD = 0f;
 
-    public float ToJulianDate(System.DateTime date)
-    {
-        float JD = 0;
+        double month = date.Month;
+        double day = date.Day;
+        double year = date.Year;
 
-        int month = date.Month;
-        int day = date.Day;
-        int year = date.Year;
+        double hour = date.Hour;
+        double minute = date.Minute;
+        double second = date.Second;
+        double millisecond = date.Millisecond;
 
         if (month < 3)
         {
-            month = month + 12;
-            year = year - 1;
+            month = month + 12.0;
+            year = year - 1.0;
         }
-        JD = day + (153 * month - 457) / 5 + 365 * year + (year / 4) - (year / 100) + (year / 400) + 1721119;
+
+        JD = day + (153.0 * month - 457.0) / 5.0 + 365.0 * year + (year / 4.0) - (year / 100.0) + (year / 400.0) + 1721119.0 + hour / 24.0 + minute / 1440.0 + second / 86400.0 + millisecond / 86400000.0;
 
         return JD;
     }

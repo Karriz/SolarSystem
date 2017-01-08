@@ -19,15 +19,29 @@ public class OrbitController : MonoBehaviour {
 
     public Color color;
 
+    private System.DateTime date;
     private Orbit orbit;
+
+    private UnityEngine.UI.Text dateText;
+
     // Use this for initialization
     void Start () {
+        date = System.DateTime.Now;
         orbit = new Orbit(par_a, par_a_rate, par_e, par_e_rate, par_i, par_i_rate, par_long_an, par_long_an_rate, par_long_pe, par_long_pe_rate, par_L, par_L_rate);
-        transform.position = orbit.CalculateCartesianCoordinates(System.DateTime.Now);
+        transform.position = orbit.CalculateCartesianCoordinates(date);
+
+        MeshRenderer renderer = transform.GetComponent<MeshRenderer>();
+        renderer.material = Instantiate(renderer.material) as Material;
+        renderer.material.color = color;
+
+        dateText = GameObject.Find("DateText").GetComponent<UnityEngine.UI.Text>();
     }
 	
 	// Update is called once per frame
 	void Update () {
-		
-	}
+        date = date.AddDays(Time.deltaTime*40);
+        transform.position = orbit.CalculateCartesianCoordinates(date);
+
+        dateText.text = date.ToString();
+    }
 }
